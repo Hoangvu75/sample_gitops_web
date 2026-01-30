@@ -4,8 +4,6 @@ pipeline {
     IMAGE_NAME = 'sample_gitops_web'
     HARBOR_HOST = 'harbor-core.harbor.svc.cluster.local'
     HARBOR_PROJECT = 'library'
-    // Ingress ClusterIP để pod resolve harbor.localhost → token URL (có thể override bằng INGRESS_CLUSTER_IP trong Jenkins)
-    INGRESS_IP = env.INGRESS_CLUSTER_IP ?: '10.96.16.102'
   }
   stages {
     stage('Build and Push (Kaniko)') {
@@ -13,12 +11,13 @@ pipeline {
         script {
           env.IMAGE_TAG = env.GIT_COMMIT?.take(7) ?: 'latest'
           def imageFull = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+          def ingressIp = env.INGRESS_CLUSTER_IP ?: '10.96.16.102'
           podTemplate(yaml: """
 apiVersion: v1
 kind: Pod
 spec:
   hostAliases:
-  - ip: "${env.INGRESS_IP}"
+  - ip: "${ingressIp}"
     hostnames:
     - harbor.localhost
   containers:
