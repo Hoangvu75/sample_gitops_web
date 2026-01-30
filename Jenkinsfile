@@ -6,29 +6,12 @@ pipeline {
     HARBOR_PROJECT = 'library'
   }
   stages {
-    stage('Get Ingress IP') {
-      steps {
-        script {
-          try {
-            env.INGRESS_IP = sh(
-              script: "kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.clusterIP}'",
-              returnStdout: true
-            ).trim()
-            if (!env.INGRESS_IP) env.INGRESS_IP = '10.96.16.102'
-          } catch (Exception e) {
-            echo "Error getting Ingress IP: ${e}"
-            env.INGRESS_IP = '10.96.16.102'
-          }
-          echo "Ingress IP for harbor.localhost: ${env.INGRESS_IP}"
-        }
-      }
-    }
     stage('Build and Push (Kaniko)') {
       steps {
         script {
           env.IMAGE_TAG = env.GIT_COMMIT?.take(7) ?: 'latest'
           def imageFull = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-          def ingressIp = env.INGRESS_IP ?: '10.96.16.102'
+          def ingressIp = env.INGRESS_CLUSTER_IP ?: '10.96.16.102'
           podTemplate(yaml: """
 apiVersion: v1
 kind: Pod
