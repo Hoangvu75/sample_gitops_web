@@ -7,24 +7,24 @@ pipeline {
   }
   stages {
     stage('Build and Push (Kaniko)') {
-      agent {
-        podTemplate(
-          containers: [
-            containerTemplate(
-              name: 'kaniko',
-              image: 'gcr.io/kaniko-project/executor:v1.6.0-debug',
-              command: 'sleep',
-              args: '99d',
-              ttyEnabled: true
-            )
-          ]
-        ) {
-          node(POD_LABEL) {
-            withCredentials([usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
-              script {
-                env.IMAGE_TAG = env.GIT_COMMIT?.take(7) ?: 'latest'
-                def imageFull = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                checkout scm
+      steps {
+        script {
+          env.IMAGE_TAG = env.GIT_COMMIT?.take(7) ?: 'latest'
+          def imageFull = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+          podTemplate(
+            containers: [
+              containerTemplate(
+                name: 'kaniko',
+                image: 'gcr.io/kaniko-project/executor:v1.6.0-debug',
+                command: 'sleep',
+                args: '99d',
+                ttyEnabled: true
+              )
+            ]
+          ) {
+            node(POD_LABEL) {
+              checkout scm
+              withCredentials([usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
                 sh """
                   mkdir -p .docker
                   AUTH=\$(echo -n "\${HARBOR_USER}:\${HARBOR_PASS}" | base64 | tr -d '\\\\n')
