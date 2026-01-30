@@ -2,16 +2,15 @@ pipeline {
   agent any
   environment {
     IMAGE_NAME = 'sample_gitops_web'
-    // Dùng commit SHA làm tag (rút ngắn 7 ký tự)
-    IMAGE_TAG = env.GIT_COMMIT?.take(7) ?: 'latest'
-    HARBOR_HOST = 'harbor.localhost'  // hoặc IP/domain Harbor của bạn
+    HARBOR_HOST = 'harbor.localhost'
     HARBOR_PROJECT = 'library'
   }
   stages {
     stage('Build') {
       steps {
         script {
-          docker.build("${HARBOR_HOST}/${HARBOR_PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}")
+          env.IMAGE_TAG = env.GIT_COMMIT?.take(7) ?: 'latest'
+          docker.build("${HARBOR_HOST}/${HARBOR_PROJECT}/${IMAGE_NAME}:${env.IMAGE_TAG}")
         }
       }
     }
@@ -19,8 +18,13 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
           sh "echo \$HARBOR_PASS | docker login ${HARBOR_HOST} -u \$HARBOR_USER --password-stdin"
-          sh "docker push ${HARBOR_HOST}/${HARBOR_PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}"
+          sh "docker push ${HARBOR_HOST}/${HARBOR_PROJECT}/${IMAGE_NAME}:${env.IMAGE_TAG}"
         }
+      }
+    }
+    stage('Clean up') {
+      steps {
+        sh "docker rmi ${HARBOR_HOST}/${HARBOR_PROJECT}/${IMAGE_NAME}:${env.IMAGE_TAG}"
       }
     }
   }
