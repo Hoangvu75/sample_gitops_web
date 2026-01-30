@@ -2,7 +2,7 @@ pipeline {
   agent any
   environment {
     IMAGE_NAME = 'sample_gitops_web'
-    HARBOR_HOST = 'harbor.localhost'
+    HARBOR_HOST = 'harbor-core.harbor.svc.cluster.local'
     HARBOR_PROJECT = 'library'
   }
   stages {
@@ -27,10 +27,10 @@ spec:
                 sh """
                   mkdir -p .docker
                   AUTH=\$(echo -n "\${HARBOR_USER}:\${HARBOR_PASS}" | base64 | tr -d '\\\\n')
-                  echo "{\\"auths\\":{\\"https://${env.HARBOR_HOST}\\":{\\"auth\\":\\"\$AUTH\\"}}}" > .docker/config.json
+                  echo "{\\"auths\\":{\\"http://${env.HARBOR_HOST}\\":{\\"auth\\":\\"\$AUTH\\"}}}" > .docker/config.json
                 """
                 container('kaniko') {
-                  sh "export DOCKER_CONFIG=\${WORKSPACE}/.docker && /kaniko/executor -f \${WORKSPACE}/Dockerfile -c \${WORKSPACE} --skip-tls-verify --destination=${imageFull}"
+                  sh "export DOCKER_CONFIG=\${WORKSPACE}/.docker && /kaniko/executor -f \${WORKSPACE}/Dockerfile -c \${WORKSPACE} --insecure --skip-tls-verify --destination=${imageFull}"
                 }
               }
             }
