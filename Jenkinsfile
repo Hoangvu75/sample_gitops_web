@@ -4,6 +4,8 @@ pipeline {
     IMAGE_NAME = 'sample_gitops_web'
     HARBOR_HOST = 'harbor.hoangvu75.space'
     HARBOR_PROJECT = 'library'
+    MANIFEST_REPO = 'https://github.com/Hoangvu75/k8s_manifest.git'
+    VALUES_PATH = 'apps/playground/sample-gitops-web/chart/values.yaml'
   }
   stages {
     stage('Build and Push (Kaniko)') {
@@ -38,5 +40,26 @@ spec:
         }
       }
     }
+
+    stage('Update Manifest (GitOps)') {
+      steps {
+        script {
+          withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+            sh """
+              rm -rf k8s_manifest || true
+              git clone https://\${GIT_USER}:\${GIT_TOKEN}@github.com/UzumakiVuHuyHoang/k8s_manifest.git
+              cd k8s_manifest
+              sed -i 's/tag: ".*"/tag: "${env.IMAGE_TAG}"/' ${env.VALUES_PATH}
+              git config user.email "jenkins@ci.local"
+              git config user.name "Jenkins CI"
+              git add ${env.VALUES_PATH}
+              git commit -m "chore: update ${env.IMAGE_NAME} image tag to ${env.IMAGE_TAG}" || echo "No changes to commit"
+              git push origin master
+            """
+          }
+        }
+      }
+    }
   }
 }
+
