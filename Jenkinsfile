@@ -7,6 +7,9 @@ pipeline {
     MANIFEST_REPO = 'https://github.com/Hoangvu75/k8s_manifest.git'
     VALUES_PATH = 'apps/playground/sample-gitops-web/chart/values.yaml'
   }
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '5'))
+  }
   stages {
     stage('Build and Push (Kaniko)') {
       steps {
