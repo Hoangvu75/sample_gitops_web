@@ -46,8 +46,8 @@ spec:
         script {
           withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
             sh """
-              rm -rf k8s_manifest || true
-              git clone https://\${GIT_USER}:\${GIT_TOKEN}@github.com/UzumakiVuHuyHoang/k8s_manifest.git
+              REPO_URL=\$(echo "${env.MANIFEST_REPO}" | sed "s|https://|https://\\${GIT_USER}:\\${GIT_TOKEN}@|")
+              git clone \$REPO_URL k8s_manifest
               cd k8s_manifest
               sed -i 's/tag: ".*"/tag: "${env.IMAGE_TAG}"/' ${env.VALUES_PATH}
               git config user.email "jenkins@ci.local"
