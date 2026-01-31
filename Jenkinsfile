@@ -60,6 +60,33 @@ spec:
         }
       }
     }
+    stage('Cleanup Old Images (Harbor)') {
+      steps {
+        script {
+          withCredentials([usernamePassword(credentialsId: 'harbor-credentials', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
+            sh '''
+              KEEP_COUNT=2
+              API_URL="https://${HARBOR_HOST}/api/v2.0/projects/${HARBOR_PROJECT}/repositories/${IMAGE_NAME}/artifacts"
+              
+              # Get all artifacts sorted by push_time desc
+              ARTIFACTS=$(curl -s -u "${HARBOR_USER}:${HARBOR_PASS}" "${API_URL}?page_size=100&sort=-push_time" | jq -r '.[].digest')
+              
+              # Count and delete old ones
+              COUNT=0
+              for DIGEST in $ARTIFACTS; do
+                COUNT=$((COUNT + 1))
+                if [ $COUNT -gt $KEEP_COUNT ]; then
+                  echo "Deleting old artifact: $DIGEST"
+                  curl -s -X DELETE -u "${HARBOR_USER}:${HARBOR_PASS}" "${API_URL}/${DIGEST}" || true
+                fi
+              done
+              
+              echo "Cleanup complete. Kept $KEEP_COUNT most recent images."
+            '''
+          }
+        }
+      }
+    }
   }
 }
 
