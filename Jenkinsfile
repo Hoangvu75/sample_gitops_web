@@ -90,5 +90,15 @@ spec:
       }
     }
   }
+  post {
+    always {
+      sh """
+        curl -X POST "https://n8n.hoangvu75.space/webhook/jenkins-notify" \
+          -H "Content-Type: application/json" \
+          -d '{"job_name":"${env.JOB_NAME}","build_number":"${env.BUILD_NUMBER}","build_url":"${env.BUILD_URL}","status":"${currentBuild.currentResult}"}'
+      """
+    }
+  }
 }
+
 
