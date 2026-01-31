@@ -69,8 +69,9 @@ spec:
               KEEP_COUNT=2
               API_URL="https://${HARBOR_HOST}/api/v2.0/projects/${HARBOR_PROJECT}/repositories/${IMAGE_NAME}/artifacts"
               
-              # Get all artifacts sorted by push_time desc
-              ARTIFACTS=$(curl -s -u "${HARBOR_USER}:${HARBOR_PASS}" "${API_URL}?page_size=100&sort=-push_time" | jq -r '.[].digest')
+              # Get all artifacts sorted by push_time desc (parse digest with grep/sed)
+              RESPONSE=$(curl -s -u "${HARBOR_USER}:${HARBOR_PASS}" "${API_URL}?page_size=100&sort=-push_time")
+              ARTIFACTS=$(echo "$RESPONSE" | grep -o '"digest":"sha256:[^"]*"' | sed 's/"digest":"//g' | sed 's/"//g')
               
               # Count and delete old ones
               COUNT=0
