@@ -23,11 +23,17 @@ RUN apk add --no-cache curl bash libstdc++ && \
     mv kubectl /usr/local/bin/ && \
     apk del curl && \
     rm -rf /var/cache/apk/* /tmp/*
+
+# Copy artifacts
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Force copy custom server and full node_modules to ensure native deps (node-pty) are present
+COPY --from=builder /app/custom-server.js ./custom-server.js
+COPY --from=builder /app/node_modules ./node_modules
+
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 USER node
-CMD ["node", "server.js"]
+CMD ["node", "custom-server.js"]
