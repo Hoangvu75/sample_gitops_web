@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Terminal as TerminalType } from 'xterm';
 import 'xterm/css/xterm.css';
 
 export default function TerminalPage() {
   const terminalRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<TerminalType | null>(null);
-  const [inputBuffer, setInputBuffer] = useState('');
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (!terminalRef.current || termRef.current) return;
@@ -15,6 +15,7 @@ export default function TerminalPage() {
     const initTerminal = async () => {
       const { Terminal } = await import('xterm');
       const { FitAddon } = await import('xterm-addon-fit');
+      const { AttachAddon } = await import('xterm-addon-attach');
 
       const term = new Terminal({
         cursorBlink: true,
@@ -37,88 +38,66 @@ export default function TerminalPage() {
 
       // Welcome message
       term.writeln('\x1b[1;36m╔════════════════════════════════════════╗\x1b[0m');
-      term.writeln('\x1b[1;36m║   Kubernetes Web Terminal              ║\x1b[0m');
+      term.writeln('\x1b[1;36m║   Interactive Kubernetes Terminal      ║\x1b[0m');
       term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m');
-      term.writeln('');
-      term.writeln('\x1b[33mAllowed commands: kubectl get, describe, logs, top, version, cluster-info\x1b[0m');
-      term.writeln('');
-      term.write('\x1b[32m$ \x1b[0m');
+      term.writeln('\x1b[33mConnecting to backend shell...\x1b[0m\r\n');
 
-      let buffer = '';
+      // Connect to WebSocket
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/socket`;
+      const socket = new WebSocket(wsUrl);
+      socketRef.current = socket;
 
-      term.onKey(({ key, domEvent }: { key: string, domEvent: KeyboardEvent }) => {
-        const code = domEvent.keyCode;
+      socket.onopen = () => {
+        term.writeln('\x1b[32mConnected! Type commands (kubectl, ls, vi...)\x1b[0m\r\n');
 
-        if (code === 13) { // Enter
-          term.writeln('');
-          if (buffer.trim()) {
-            executeCommand(buffer.trim(), term);
-          } else {
-            term.write('\x1b[32m$ \x1b[0m');
-          }
-          buffer = '';
-        } else if (code === 8) { // Backspace
-          if (buffer.length > 0) {
-            buffer = buffer.slice(0, -1);
-            term.write('\b \b');
-          }
-        } else if (domEvent.key.length === 1) {
-          buffer += domEvent.key;
-          term.write(domEvent.key);
+        const attachAddon = new AttachAddon(socket);
+        term.loadAddon(attachAddon);
+
+        // Initial resize
+        socket.send(`RESZ:${term.cols}:${term.rows}`);
+        term.focus();
+      };
+
+      socket.onclose = () => {
+        term.writeln('\r\n\x1b[31mConnection closed.\x1b[0m');
+      };
+
+      socket.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        term.writeln('\r\n\x1b[31mConnection error.\x1b[0m');
+      };
+
+      // Handle resize
+      const handleResize = () => {
+        fitAddon.fit();
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(`RESZ:${term.cols}:${term.rows}`);
         }
-      });
-
-      const handleResize = () => fitAddon.fit();
+      };
       window.addEventListener('resize', handleResize);
 
       return () => {
         window.removeEventListener('resize', handleResize);
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
         term.dispose();
       };
     };
 
     initTerminal();
-  }, []);
 
-  const executeCommand = async (command: string, term: TerminalType) => {
-    const cleanCommand = command.trim();
-
-    // Handle clear command locally
-    if (cleanCommand === 'clear') {
-      term.reset();
-      term.write('\x1b[32m$ \x1b[0m');
-      return;
-    }
-
-    // Send raw command to API (backend allows shell commands now)
-    // We don't prepend 'kubectl' anymore to allow ls, grep, etc.
-    // User must key in full 'kubectl get pods' if needed.
-
-    try {
-      const res = await fetch('/api/kubectl', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cleanCommand }),
-      });
-
-      const data = await res.json();
-
-      if (data.error) {
-        term.writeln(`\x1b[31mError: ${data.error}\x1b[0m`);
-      } else {
-        if (data.stdout) {
-          data.stdout.split('\n').forEach((line: string) => term.writeln(line));
-        }
-        if (data.stderr) {
-          data.stderr.split('\n').forEach((line: string) => term.writeln(`\x1b[31m${line}\x1b[0m`));
-        }
+    // Cleanup
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close();
       }
-    } catch (err: any) {
-      term.writeln(`\x1b[31mFetch error: ${err.message}\x1b[0m`);
-    }
-
-    term.write('\x1b[32m$ \x1b[0m');
-  };
+      if (termRef.current) {
+        termRef.current.dispose();
+      }
+    };
+  }, []);
 
   return (
     <div style={{
