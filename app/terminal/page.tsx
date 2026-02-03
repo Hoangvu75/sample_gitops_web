@@ -1,80 +1,86 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
+import type { Terminal as TerminalType } from 'xterm';
 import 'xterm/css/xterm.css';
 
 export default function TerminalPage() {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<Terminal | null>(null);
+  const termRef = useRef<TerminalType | null>(null);
   const [inputBuffer, setInputBuffer] = useState('');
 
   useEffect(() => {
     if (!terminalRef.current || termRef.current) return;
 
-    const term = new Terminal({
-      cursorBlink: true,
-      theme: {
-        background: '#1a1a2e',
-        foreground: '#eee',
-        cursor: '#0f0',
-        selectionBackground: '#444',
-      },
-      fontSize: 14,
-      fontFamily: 'Consolas, Monaco, monospace',
-    });
+    const initTerminal = async () => {
+      const { Terminal } = await import('xterm');
+      const { FitAddon } = await import('xterm-addon-fit');
 
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(terminalRef.current);
-    fitAddon.fit();
+      const term = new Terminal({
+        cursorBlink: true,
+        theme: {
+          background: '#1a1a2e',
+          foreground: '#eee',
+          cursor: '#0f0',
+          selectionBackground: '#444',
+        },
+        fontSize: 14,
+        fontFamily: 'Consolas, Monaco, monospace',
+      });
 
-    termRef.current = term;
+      const fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(terminalRef.current!);
+      fitAddon.fit();
 
-    // Welcome message
-    term.writeln('\x1b[1;36m╔════════════════════════════════════════╗\x1b[0m');
-    term.writeln('\x1b[1;36m║   Kubernetes Web Terminal              ║\x1b[0m');
-    term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m');
-    term.writeln('');
-    term.writeln('\x1b[33mAllowed commands: kubectl get, describe, logs, top, version, cluster-info\x1b[0m');
-    term.writeln('');
-    term.write('\x1b[32m$ \x1b[0m');
+      termRef.current = term;
 
-    let buffer = '';
+      // Welcome message
+      term.writeln('\x1b[1;36m╔════════════════════════════════════════╗\x1b[0m');
+      term.writeln('\x1b[1;36m║   Kubernetes Web Terminal              ║\x1b[0m');
+      term.writeln('\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m');
+      term.writeln('');
+      term.writeln('\x1b[33mAllowed commands: kubectl get, describe, logs, top, version, cluster-info\x1b[0m');
+      term.writeln('');
+      term.write('\x1b[32m$ \x1b[0m');
 
-    term.onKey(({ key, domEvent }: { key: string, domEvent: KeyboardEvent }) => {
-      const code = domEvent.keyCode;
+      let buffer = '';
 
-      if (code === 13) { // Enter
-        term.writeln('');
-        if (buffer.trim()) {
-          executeCommand(buffer.trim(), term);
-        } else {
-          term.write('\x1b[32m$ \x1b[0m');
+      term.onKey(({ key, domEvent }: { key: string, domEvent: KeyboardEvent }) => {
+        const code = domEvent.keyCode;
+
+        if (code === 13) { // Enter
+          term.writeln('');
+          if (buffer.trim()) {
+            executeCommand(buffer.trim(), term);
+          } else {
+            term.write('\x1b[32m$ \x1b[0m');
+          }
+          buffer = '';
+        } else if (code === 8) { // Backspace
+          if (buffer.length > 0) {
+            buffer = buffer.slice(0, -1);
+            term.write('\b \b');
+          }
+        } else if (domEvent.key.length === 1) {
+          buffer += domEvent.key;
+          term.write(domEvent.key);
         }
-        buffer = '';
-      } else if (code === 8) { // Backspace
-        if (buffer.length > 0) {
-          buffer = buffer.slice(0, -1);
-          term.write('\b \b');
-        }
-      } else if (domEvent.key.length === 1) {
-        buffer += domEvent.key;
-        term.write(domEvent.key);
-      }
-    });
+      });
 
-    const handleResize = () => fitAddon.fit();
-    window.addEventListener('resize', handleResize);
+      const handleResize = () => fitAddon.fit();
+      window.addEventListener('resize', handleResize);
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      term.dispose();
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        term.dispose();
+      };
     };
+
+    initTerminal();
   }, []);
 
-  const executeCommand = async (command: string, term: Terminal) => {
+  const executeCommand = async (command: string, term: TerminalType) => {
     // Auto-prepend kubectl if not present
     const fullCommand = command.startsWith('kubectl ') ? command : `kubectl ${command}`;
 
