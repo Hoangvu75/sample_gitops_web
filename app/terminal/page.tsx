@@ -81,14 +81,24 @@ export default function TerminalPage() {
   }, []);
 
   const executeCommand = async (command: string, term: TerminalType) => {
-    // Auto-prepend kubectl if not present
-    const fullCommand = command.startsWith('kubectl ') ? command : `kubectl ${command}`;
+    const cleanCommand = command.trim();
+
+    // Handle clear command locally
+    if (cleanCommand === 'clear') {
+      term.reset();
+      term.write('\x1b[32m$ \x1b[0m');
+      return;
+    }
+
+    // Send raw command to API (backend allows shell commands now)
+    // We don't prepend 'kubectl' anymore to allow ls, grep, etc.
+    // User must key in full 'kubectl get pods' if needed.
 
     try {
       const res = await fetch('/api/kubectl', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: fullCommand }),
+        body: JSON.stringify({ command: cleanCommand }),
       });
 
       const data = await res.json();

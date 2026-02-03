@@ -12,11 +12,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Command is required' }, { status: 400 });
     }
 
-    // Security check: ensure command starts with kubectl
-    if (!command.trim().startsWith('kubectl')) {
-      return NextResponse.json({ error: 'Only kubectl commands are allowed' }, { status: 403 });
-    }
-
     // Execute command
     const { stdout, stderr } = await execAsync(command, {
       timeout: 30000,
