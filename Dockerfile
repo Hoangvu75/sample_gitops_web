@@ -10,6 +10,14 @@ RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
+# Stage: Production Dependencies
+# Install ONLY production dependencies (includes node-pty compilation)
+FROM node:20-alpine AS deps-prod
+RUN apk add --no-cache python3 make g++
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci --only=production && npm cache clean --force
+
 # Runner - minimal Alpine with kubectl
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -28,9 +36,10 @@ RUN apk add --no-cache curl bash libstdc++ && \
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-# Force copy custom server and full node_modules to ensure native deps (node-pty) are present
+# Copy custom server
 COPY --from=builder /app/custom-server.js ./custom-server.js
-COPY --from=builder /app/node_modules ./node_modules
+# Copy optimized prod node_modules from deps-prod stage
+COPY --from=deps-prod /app/node_modules ./node_modules
 
 EXPOSE 3000
 ENV PORT=3000
