@@ -33,6 +33,23 @@ export default function Home() {
             Host: <HostDisplay />
           </p>
         </section>
+
+        <section className="terminal-link" style={{ marginTop: '2rem', textAlign: 'center' }}>
+          <a
+            href="/terminal"
+            style={{
+              display: 'inline-block',
+              padding: '12px 24px',
+              backgroundColor: '#6b8afd',
+              color: '#fff',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              fontWeight: 'bold'
+            }}
+          >
+            🖥️ Open Kubectl Terminal
+          </a>
+        </section>
       </main>
 
       <footer>
